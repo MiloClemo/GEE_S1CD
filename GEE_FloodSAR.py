@@ -1,10 +1,7 @@
 import ee
 import datetime
-import urllib2
-import zipfile
 import requests
 import zipfile
-import StringIO
 
 # Check User Credentials
 ee.Initialize()
