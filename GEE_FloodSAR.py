@@ -77,9 +77,6 @@ class Aoi:
         zipped_results = zipfile.ZipFile('test.zip')
         zipped_results.extractall()
 
-
-
-
 if __name__ == '__main__':
     run = Aoi('ft:137bhlHOilFr5iTTuSMWJo7jRLCnSCHQaICzLzmJQ',
               'COPERNICUS/S1_GRD/S1A_IW_GRDH_1SDV_20160103T062204_20160103T062229_009326_00D7AC_C9F2')
