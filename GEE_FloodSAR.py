@@ -2,6 +2,11 @@ import ee
 import datetime
 import requests
 import zipfile
+import numpy as np
+import os
+import gdal
+from osgeo.gdalconst import GA_ReadOnly, GDT_Float32
+
 
 # Check User Credentials
 ee.Initialize()
@@ -59,15 +64,28 @@ class Aoi:
         # Calculate Diff
         self.results = clipped_flood_image.select('VH').subtract(clipped_median_image.select('VH'))
 
+    ### Original attempt at thresholding
+    #def threshold(self):
+        # Calculate Mean of Image
+        #array = np.array(self.results)
+        #print array.shape
+        #print array.ndim
+        #print array.dtype.name
+        #print type(array)
+        #self.mean = array.mean()
+        #print self.mean
+
+
     def download(self):
 
-        path = self.results.getDownloadUrl({
-            'scale': 30,
-            'description' : 'Jan3VH_diff',
+        self.path = self.results.getDownloadUrl({
+            'scale': 20,
+            'geometry': self.fusion_table,
+            'description' : 'Test',
         })
-        print path
+        print self.path
 
-        request = requests.get(path, stream=True)
+        request = requests.get(self.path, stream=True)
 
         with open('test.zip', 'wb') as f:
             for chunk in request.iter_content(chunk_size=1024):
@@ -77,11 +95,45 @@ class Aoi:
         zipped_results = zipfile.ZipFile('test.zip')
         zipped_results.extractall()
 
+
+    def threshold(self):
+        gdal.AllRegister()
+        os.getcwd()
+        driver = gdal.GetDriverByName('GTiff')
+        pathname = 'E:/PyCharm/' + self.path[55:87] + '.VH.tif'
+        opengd = gdal.Open(pathname, GA_ReadOnly)
+        array = opengd.ReadAsArray(0, 0, opengd.RasterXSize, opengd.RasterYSize)
+        # Set 0 as NoData as not set in GEE
+        array[array == 0] = np.nan
+        # Calculate Mean, SD and Threshold Value
+        mean = np.nanmean(array)
+        sd = np.nanstd(array)
+        threshold = mean - (1.5*sd)
+        print 'Mean: ', mean
+        print 'Standard Deviation: ', sd
+        print 'Threshold Value: ', threshold
+        # Reset NoData to 0 (as crashes otherwise)
+        array = np.nan_to_num(array)
+        # Threshold the data
+        array[array > threshold] = np.nan
+        # Output
+        outDataSet = driver.Create('E:/PyCharm/testing.tif', opengd.RasterXSize,\
+                                   opengd.RasterYSize, 1, GDT_Float32)
+        outBand = outDataSet.GetRasterBand(1)
+        outBand.WriteArray(array, 0, 0)
+        outBand.SetNoDataValue(-9999)
+        outDataSet.SetProjection(opengd.GetProjection())
+        outDataSet.SetGeoTransform(opengd.GetGeoTransform())
+        outBand.FlushCache()
+        outDataSet.FlushCache()
+
 if __name__ == '__main__':
-    run = Aoi('ft:137bhlHOilFr5iTTuSMWJo7jRLCnSCHQaICzLzmJQ',
-              'COPERNICUS/S1_GRD/S1A_IW_GRDH_1SDV_20160103T062204_20160103T062229_009326_00D7AC_C9F2')
+    run = Aoi('ft:1u3KrTf5vz1ntE5hqVCRU_7I5_afqEkM-NYrDyurL',
+              'COPERNICUS/S1_GRD/S1A_IW_GRDH_1SDV_20151229T061403_20151229T061428_009253_00D59B_CC2A')
 
     run.print_orbit_and_track()
     run.analyse()
     run.download()
+    run.threshold()
+
 
